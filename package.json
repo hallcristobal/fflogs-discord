@@ -1,0 +1,22 @@
+{
+  "name": "fflogs",
+  "version": "0.0.0",
+  "description": "fflogs",
+  "main": "src/app.js",
+  "author": {
+    "name": ""
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "run": "ts-node src/app.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^8.0.14",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.6.2"
+  },
+  "dependencies": {
+    "discord.js": "^11.5.1"
+  }
+}
