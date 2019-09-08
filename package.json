@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc --build",
     "clean": "tsc --build --clean",
-    "run": "ts-node src/app.ts"
+    "start": "ts-node src/app.ts"
   },
   "devDependencies": {
     "@types/node": "^8.0.14",
@@ -17,6 +17,10 @@
     "typescript": "^3.6.2"
   },
   "dependencies": {
-    "discord.js": "^11.5.1"
+    "@types/request": "^2.48.2",
+    "@types/request-promise": "^4.1.44",
+    "discord.js": "^11.5.1",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
   }
 }
