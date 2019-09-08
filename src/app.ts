@@ -1,14 +1,29 @@
 ﻿import * as Discord from "discord.js";
-import config = require("./../config.js");
-import FFLogs from "./fflogs";
+import { configure, getLogger } from "log4js";
+import Config = require("./../config.js");
+import FFLogs, { Expansion as FFExpansion, FightCategory, parseCategory, parseExpansion } from "./fflogs";
 import { SERVER_MAP } from "./servers";
 import { getThumbnailUrl } from "./xivapi";
 
 interface IConfig {
   TOKEN: string;
   FFLOGS_KEY: string;
+  LOG_LEVEL: string | null;
 }
+const config = Config as IConfig;
+configure({
+  appenders: {
+    out: { type: "stdout" },
+  },
+  categories: {
+    default: { appenders: ["out"], level: "all" },
+  },
+});
 const client = new Discord.Client();
+const fflogs = new FFLogs(config.FFLOGS_KEY);
+const logger = getLogger("app");
+
+fflogs.updateZones();
 
 const EMOTE_MAP = {
   "Astrologian": "<:Astrologian:619932348816949269>",
@@ -30,37 +45,36 @@ const EMOTE_MAP = {
 };
 
 client.on("ready", () => {
-  console.log(`Logged in as ${client.user.tag}!`);
+  logger.info(`Logged in as ${client.user.tag}!`);
 });
 
 client.on("message", async (msg) => {
   if (msg.content.toLowerCase().startsWith("?tierlogs")) {
     msg.channel.send(await sendLogs(msg.content.split(" ").slice(1)));
   } else if (msg.content.toLowerCase() === "test") {
-    msg.channel.send(await sendLogs(["Diabolos", "Rova", "Asundera"]));
+    // hold
   }
 });
 
 async function sendLogs(args: string[]): Promise<Discord.RichEmbed | string> {
-  console.log(args);
-  if (args.length !== 3) {
-    return "Character must be specified using the format: ?tierlogs <World> <Forename> <Surname>";
+  logger.trace(args);
+  if (args.length < 3) {
+    return "Character must be specified using the format: ?tierlogs World Forename Surname <Expansion> <Category>";
   }
 
-  const { Name, Server } = { Name: args[1] + " " + args[2], Server: args[0] };
+  const { Name, Server, Expansion, Category } = { Name: args[1] + " " + args[2], Server: args[0], Expansion: parseExpansion(args[3]), Category: parseCategory(args[4]) };
 
   let thumbnailUrl = "";
   try {
     thumbnailUrl = await getThumbnailUrl(Server, Name);
   } catch (e) {
-    console.debug(e);
+    logger.debug(e);
     return "Could not find Character";
   }
-  const rankings = await new FFLogs(config.FFLOGS_KEY).getRankings(Server, Name);
+  const rankings = await fflogs.getRankings(Server, Name, Category, Expansion);
   if (rankings.length === 0) {
     return `No logs found for ${Name} of ${Server}`;
   }
-
   const embed = new Discord.RichEmbed();
   embed
     .setColor("#0099ff")
@@ -69,11 +83,24 @@ async function sendLogs(args: string[]): Promise<Discord.RichEmbed | string> {
     .setThumbnail(thumbnailUrl);
 
   let parsesText = "";
+  let currentZone = null;
   for (const parse of rankings) {
+    const zone = fflogs.getZoneForEncounter(parse.encounterID, parse.difficulty === 101 ? FightCategory.Savage : null);
+    if (currentZone === null) {
+      currentZone = zone;
+    }
     const logLink = `https://www.fflogs.com/reports/${parse.reportID}#fight=${parse.fightID}&type=damage-done`;
-    parsesText += `${EMOTE_MAP[parse.spec]} ${parse.encounterName} [${(roundedLocalized(parse.total))} DPS](${logLink}) ${parse.percentile}% • ${millisToMinutesAndSeconds(parse.duration)}\n`;
+    const text = `${EMOTE_MAP[parse.spec]} ${parse.encounterName} [${(roundedLocalized(parse.total))} DPS](${logLink}) ${parse.percentile}% • ${millisToMinutesAndSeconds(parse.duration)}\n`;
+    if (zone.id !== currentZone.id || parsesText.length + text.length > 1024) {
+      embed.addField(zone.name, parsesText);
+      parsesText = "";
+      if (currentZone.id !== zone.id) {
+        currentZone = zone;
+      }
+    }
+    parsesText += text;
   }
-  embed.addField("Eden's Gate (Savage)", parsesText);
+  embed.addField(currentZone.name, parsesText);
   return embed;
 }
 

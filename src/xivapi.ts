@@ -1,4 +1,6 @@
+import { getLogger } from "log4js";
 import * as request from "request-promise";
+const logger = getLogger("xivapi");
 
 interface IXIVApiResponse {
   Pagination: {
@@ -31,7 +33,7 @@ export async function getThumbnailUrl(server: string, name: string) {
   }
 
   const requestUri = `https://xivapi.com/character/search?name=${encodeURIComponent(name)}&server=${encodeURIComponent(server)}`;
-  console.debug(`Fetching thumbnail from ${requestUri}`);
+  logger.trace(`Fetching thumbnail from ${requestUri}`);
 
   const response = await request.get(requestUri, { json: true }) as IXIVApiResponse;
   if (response.Pagination.ResultsTotal !== 1) {
